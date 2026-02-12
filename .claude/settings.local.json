@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(ls:*)",
-      "Bash(python3:*)"
+      "Bash(python3:*)",
+      "Bash(git -C /Users/cyrilwisa/Downloads/Bulletinsprojett status)",
+      "Bash(find:*)"
     ]
   }
 }

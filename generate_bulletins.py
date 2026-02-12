@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Generateur de Bulletins Scolaires
-Lit notes.xlsx, applique la formule de reajustement, genere des bulletins HTML/PDF
+Generateur de Bulletins Scolaires - PAES + Linova Education
+Lit les fichiers Excel du dossier notes/ (1 fichier = 1 matiere),
+applique la formule de reajustement, genere des bulletins HTML/PDF
+pour chaque eleve en version PAES et Linova.
 """
 
 import os
+import gc
 from pathlib import Path
 from openpyxl import load_workbook
 from weasyprint import HTML
@@ -15,8 +18,8 @@ import random
 
 # === CONFIGURATION ===
 
-# Informations de l'etablissement
-ETABLISSEMENT = {
+# Profil PAES (Diploma Sante)
+PROFIL_PAES = {
     "nom": "Diploma Santé",
     "adresse": "85 Avenue Ledru Rollin",
     "code_postal": "75012",
@@ -24,26 +27,62 @@ ETABLISSEMENT = {
     "annee_scolaire": "2025/2026",
     "classe": "PAES",
     "charge_etudes": "Shirel Benchetrit",
-    "semestre": "1er Semestre"
+    "semestre": "Annuel",
+    "logo": "logo_etablissement.png",
+    "tampon": "tampon.png",
 }
 
-# Mapping des colonnes Excel vers les matieres du bulletin
-# L'ordre correspond a l'ordre dans le template (MATIERE_1 a MATIERE_9)
-MATIERES_CONFIG = [
-    {"nom": "Biochimie", "col_excel": "Biochimie", "enseignant": "M. Da Fonseca"},
-    {"nom": "Biologie Cellulaire", "col_excel": "Biologie Cellulaire", "enseignant": "M. Descatoire"},
-    {"nom": "Biostatistiques", "col_excel": "Biostatistiques", "enseignant": "U. Bederede"},
-    {"nom": "Chimie Médecine", "col_excel": "Chimie 1", "enseignant": "R. Hadjerci"},
-    {"nom": "Chimie Terminale", "col_excel": "Chimie 2", "enseignant": "D. Yazidi"},
-    {"nom": "Mathématiques", "col_excel": "Maths", "enseignant": "U. Bederede"},
-    {"nom": "Physique", "col_excel": "Physique", "enseignant": "H. Diaw"},
-    {"nom": "Physique/Biophysique", "col_excel": "Physique Biophysique", "enseignant": "H. Diaw"},
-    {"nom": "SVT", "col_excel": "SVT", "enseignant": "M. Descatoire"},
+# Profil Linova Education
+PROFIL_LINOVA = {
+    "nom": "Linova Education",
+    "adresse": "100 Quai de la Rapée",
+    "code_postal": "75012",
+    "ville": "Paris",
+    "annee_scolaire": "2025/2026",
+    "classe": "1",
+    "charge_etudes": "Cyril Robert",
+    "semestre": "Annuel",
+    "logo": "logo_linova.png",
+    "tampon": "tampon_linova.jpeg",
+}
+
+# Matieres PAES avec mapping vers fichiers Excel
+MATIERES_PAES = [
+    {"nom": "Biochimie", "excel_file": "Resultats-CB1 - Biochimie (1).xlsx", "enseignant": "M. Benramdane"},
+    {"nom": "Biologie Cellulaire", "excel_file": "Resultats-CB1 - Biologie Cellulaire  (1).xlsx", "enseignant": "M. Descatoire"},
+    {"nom": "Biostatistiques", "excel_file": "Resultats-CB1 - Biostatistiques  (1).xlsx", "enseignant": "U. Bederede"},
+    {"nom": "Chimie Médecine", "excel_file": "Resultats-CB1 - Chimie  (2).xlsx", "enseignant": "R. Hadjerci"},
+    {"nom": "Chimie Terminale", "excel_file": "Resultats-CB1 - Chimie  (3).xlsx", "enseignant": "D. Yazidi"},
+    {"nom": "Mathématiques", "excel_file": "Resultats-CB1 - Maths (1).xlsx", "enseignant": "U. Bederede"},
+    {"nom": "Physique", "excel_file": "Resultats-CB1 - Physique (1).xlsx", "enseignant": "H. Diaw"},
+    {"nom": "Physique/Biophysique", "excel_file": "Resultats-CB1 - Physique Biophysique  (1).xlsx", "enseignant": "H. Diaw"},
+    {"nom": "SVT", "excel_file": "Resultats-CB1 - SVT (1).xlsx", "enseignant": "M. Descatoire"},
 ]
 
-# Appreciations par matiere - chaque matiere a ses propres appreciations
-# pour eviter les doublons sur un meme bulletin
-APPRECIATIONS_PAR_MATIERE = {
+# Matieres Linova avec mapping vers les matieres PAES (pour reutiliser les notes)
+MATIERES_LINOVA = [
+    {"nom": "Démarche qualité et organisation opérationnelle au sein du laboratoire de biologie médicale",
+     "source_paes": "Biochimie", "enseignant": "M. Benramdane"},
+    {"nom": "Analyses médicales les plus courantes",
+     "source_paes": "Biologie Cellulaire", "enseignant": "M. Descatoire"},
+    {"nom": "Amélioration des méthodes d'analyse de biologie médicale - Pratiques à visée thérapeutique",
+     "source_paes": "Biostatistiques", "enseignant": "M. Descatoire"},
+    {"nom": "Relations, collaboration et développement professionnels",
+     "source_paes": "Chimie Médecine", "enseignant": "M. Benramdane"},
+    {"nom": "Prélèvements de sang et d'autres échantillons biologiques / Culture générale et expression",
+     "source_paes": "Chimie Terminale", "enseignant": "Aurore Pottier"},
+    {"nom": "Anglais",
+     "source_paes": "Physique/Biophysique", "enseignant": "Hanna Charbit"},
+    {"nom": "SVT",
+     "source_paes": "SVT", "enseignant": "M. Descatoire"},
+    {"nom": "Mathématiques",
+     "source_paes": "Mathématiques", "enseignant": "MOKRANE Zahia"},
+    {"nom": "Physique-Chimie",
+     "source_paes": "Physique", "enseignant": "MOKRANE Zahia"},
+]
+
+# Appreciations par matiere PAES
+APPRECIATIONS_PAES = {
     "Biochimie": {
         "insuffisant": "Les notions de biochimie nécessitent un approfondissement. Un travail régulier permettra de progresser.",
         "passable": "Les bases en biochimie sont acquises. Poursuivez vos efforts pour consolider vos connaissances.",
@@ -109,35 +148,114 @@ APPRECIATIONS_PAR_MATIERE = {
     }
 }
 
+# Appreciations par matiere Linova
+APPRECIATIONS_LINOVA = {
+    "Démarche qualité et organisation opérationnelle au sein du laboratoire de biologie médicale": {
+        "insuffisant": "Les notions de démarche qualité en laboratoire nécessitent un approfondissement. Un travail régulier permettra de progresser.",
+        "passable": "Les bases de la démarche qualité sont acquises. Poursuivez vos efforts pour consolider vos connaissances.",
+        "assez_bien": "Bonne compréhension de l'organisation opérationnelle en laboratoire. Continuez sur cette voie prometteuse.",
+        "bien": "Très bonne maîtrise de la démarche qualité et de l'organisation en laboratoire. Persévérez.",
+        "excellent": "Excellente maîtrise de la démarche qualité en laboratoire. Félicitations pour ce travail remarquable."
+    },
+    "Analyses médicales les plus courantes": {
+        "insuffisant": "Les techniques d'analyses médicales doivent être revues. Un travail plus soutenu est nécessaire.",
+        "passable": "Compréhension correcte des analyses médicales courantes. Des efforts supplémentaires consolideront vos acquis.",
+        "assez_bien": "Bonne assimilation des méthodes d'analyses médicales. Maintenez cette dynamique positive.",
+        "bien": "Très bonne compréhension des analyses médicales courantes. Continuez ainsi.",
+        "excellent": "Maîtrise remarquable des analyses médicales les plus courantes. Travail exemplaire."
+    },
+    "Amélioration des méthodes d'analyse de biologie médicale - Pratiques à visée thérapeutique": {
+        "insuffisant": "Les méthodes d'amélioration des analyses demandent plus de pratique. Un entraînement régulier est conseillé.",
+        "passable": "Les bases des méthodes d'analyse sont comprises. Continuez à vous exercer pour gagner en aisance.",
+        "assez_bien": "Bonne application des méthodes d'analyse de biologie médicale. Poursuivez vos efforts.",
+        "bien": "Très bonne maîtrise des méthodes d'analyse à visée thérapeutique. Résultats très satisfaisants.",
+        "excellent": "Excellente compréhension et application des méthodes d'analyse de biologie médicale. Bravo."
+    },
+    "Relations, collaboration et développement professionnels": {
+        "insuffisant": "Les compétences relationnelles et collaboratives doivent être renforcées. Travaillez régulièrement.",
+        "passable": "Niveau correct en relations et collaboration professionnelles. Poursuivez vos efforts.",
+        "assez_bien": "Bonne compréhension des enjeux de collaboration et développement professionnel. Continuez ainsi.",
+        "bien": "Très bon niveau en relations et développement professionnels. Résultats encourageants.",
+        "excellent": "Excellente maîtrise des compétences relationnelles et professionnelles. Félicitations."
+    },
+    "Prélèvements de sang et d'autres échantillons biologiques / Culture générale et expression": {
+        "insuffisant": "Les techniques de prélèvement et les compétences en expression nécessitent une révision. Un travail soutenu s'impose.",
+        "passable": "Les notions de prélèvement et de culture générale sont assimilées. Continuez à progresser.",
+        "assez_bien": "Bonne maîtrise des techniques de prélèvement et de l'expression. Persévérez dans vos efforts.",
+        "bien": "Très bonne compréhension des prélèvements biologiques et de la culture générale. Résultats très positifs.",
+        "excellent": "Excellents résultats en prélèvements et culture générale. Travail remarquable et rigoureux."
+    },
+    "Anglais": {
+        "insuffisant": "Les compétences en anglais doivent être consolidées. Un entraînement quotidien est recommandé.",
+        "passable": "Niveau satisfaisant en anglais. Continuez à pratiquer pour progresser.",
+        "assez_bien": "Bonne maîtrise de l'anglais. Maintenez vos efforts.",
+        "bien": "Très bon niveau en anglais. Vos compétences linguistiques sont solides.",
+        "excellent": "Excellente maîtrise de l'anglais. Résultats impressionnants, félicitations."
+    },
+    "SVT": {
+        "insuffisant": "Les connaissances en SVT doivent être renforcées. Un travail plus régulier est nécessaire.",
+        "passable": "Niveau correct en SVT. Poursuivez vos efforts pour améliorer vos résultats.",
+        "assez_bien": "Bonne compréhension des sciences de la vie et de la Terre. Continuez ainsi.",
+        "bien": "Très bonne maîtrise des SVT. Vos résultats reflètent un travail sérieux.",
+        "excellent": "Excellents résultats en SVT. Travail remarquable et approfondi, bravo."
+    },
+    "Mathématiques": {
+        "insuffisant": "Les compétences mathématiques doivent être consolidées. Un entraînement quotidien est recommandé.",
+        "passable": "Niveau satisfaisant en mathématiques. Continuez à pratiquer pour progresser.",
+        "assez_bien": "Bonne maîtrise des outils mathématiques. Maintenez vos efforts.",
+        "bien": "Très bon niveau en mathématiques. Vos compétences sont solides.",
+        "excellent": "Excellente maîtrise des mathématiques. Résultats impressionnants, félicitations."
+    },
+    "Physique-Chimie": {
+        "insuffisant": "Les concepts de physique-chimie nécessitent plus de travail. Revoyez les notions fondamentales.",
+        "passable": "Compréhension correcte de la physique-chimie. Poursuivez vos efforts.",
+        "assez_bien": "Bonne assimilation des lois de physique-chimie. Continuez sur cette lancée positive.",
+        "bien": "Très bonne maîtrise de la physique-chimie. Vos efforts portent leurs fruits.",
+        "excellent": "Excellente compréhension de la physique-chimie. Travail exemplaire et rigoureux."
+    }
+}
+
 # Chemins
 BASE_DIR = Path(__file__).parent
-EXCEL_FILE = BASE_DIR / "notes.xlsx"
+NOTES_DIR = BASE_DIR / "notes"
 TEMPLATE_FILE = BASE_DIR / "bulletin_template.html"
-HTML_OUTPUT_DIR = BASE_DIR / "bulletins_html"
-PDF_OUTPUT_DIR = BASE_DIR / "bulletins_pdf"
+TEMPLATE_LINOVA_FILE = BASE_DIR / "bulletin_template_linova.html"
+
 
 def adjust_grade(note):
     """Applique la formule f(x) = 0.57x + 8.74, plafonnee a 20
     Si pas de note, retourne une note aleatoire entre 9.5 et 12"""
     if note is None or note == "-" or note == "":
-        # Generer une note aleatoire entre 9.5 et 12 (note APRES harmonisation)
         return round(random.uniform(9.5, 12.0), 1)
     try:
         note_float = float(note)
         adjusted = 0.57 * note_float + 8.74
-        return min(adjusted, 20.0)  # Plafonner a 20
+        return min(adjusted, 20.0)
     except (ValueError, TypeError):
-        # Si erreur de conversion, generer une note aleatoire
         return round(random.uniform(9.5, 12.0), 1)
 
 
-def get_appreciation(note, matiere_nom):
+def parse_note_string(note_str):
+    """Parse le format 'XX.XX / 20' vers un float"""
+    if note_str is None or str(note_str).strip() == "":
+        return None
+    try:
+        s = str(note_str).strip()
+        if "/" in s:
+            parts = s.split("/")
+            return float(parts[0].strip())
+        else:
+            return float(s)
+    except (ValueError, IndexError):
+        return None
+
+
+def get_appreciation(note, matiere_nom, appreciations_dict):
     """Genere une appreciation basee sur la note et la matiere"""
     if note is None:
-        note = 10.5  # Note moyenne par defaut
+        note = 10.5
 
-    # Recuperer les appreciations de la matiere
-    appreciations = APPRECIATIONS_PAR_MATIERE.get(matiere_nom, {})
+    appreciations = appreciations_dict.get(matiere_nom, {})
 
     if note < 10:
         return appreciations.get("insuffisant", "Des efforts sont nécessaires pour progresser.")
@@ -157,15 +275,15 @@ def get_appreciation_generale(prenom, moyenne):
         moyenne = 10.5
 
     if moyenne < 10:
-        return f"{prenom} doit fournir davantage d'efforts pour progresser. Un travail régulier et soutenu permettra d'améliorer les résultats au prochain semestre."
+        return f"{prenom} doit fournir davantage d'efforts pour progresser. Un travail régulier et soutenu permettra d'améliorer les résultats l'année prochaine."
     elif moyenne < 12:
         return f"{prenom} montre des résultats encourageants. Avec plus de régularité dans le travail, les résultats continueront de s'améliorer."
     elif moyenne < 14:
-        return f"{prenom} fournit un bon travail ce semestre. Les bases sont acquises et les efforts doivent être maintenus pour progresser davantage."
+        return f"{prenom} fournit un bon travail cette année. Les bases sont acquises et les efforts doivent être maintenus pour progresser davantage."
     elif moyenne < 16:
-        return f"{prenom} a fourni un travail régulier et rigoureux tout au long du semestre. Les résultats sont très satisfaisants. Continuez ainsi."
+        return f"{prenom} a fourni un travail régulier et rigoureux tout au long de l'année. Les résultats sont très satisfaisants. Continuez ainsi."
     else:
-        return f"{prenom} a fourni un travail remarquable tout au long du semestre. Félicitations pour ces excellents résultats."
+        return f"{prenom} a fourni un travail remarquable tout au long de l'année. Félicitations pour ces excellents résultats."
 
 
 def format_note(note):
@@ -184,79 +302,195 @@ def format_date(date_value):
     return str(date_value)
 
 
+def capitalize_name(name):
+    """Met la premiere lettre de chaque partie du nom en majuscule,
+    en preservant les particules et tirets"""
+    if not name:
+        return ""
+    # Traiter chaque partie separee par un espace
+    parts = name.strip().split()
+    result = []
+    for part in parts:
+        # Gerer les tirets composes (ex: Jean-Baptiste)
+        if '-' in part:
+            sub = part.split('-')
+            result.append('-'.join(s[0].upper() + s[1:].lower() if s else s for s in sub))
+        else:
+            result.append(part[0].upper() + part[1:].lower() if part else part)
+    return ' '.join(result)
+
+
 def sanitize_filename(text):
     """Nettoie un texte pour en faire un nom de fichier valide"""
-    # Normaliser les caracteres unicode
     text = unicodedata.normalize('NFKD', str(text))
     text = text.encode('ASCII', 'ignore').decode('ASCII')
-    # Remplacer les espaces et caracteres speciaux
     text = re.sub(r'[^\w\s-]', '', text)
     text = re.sub(r'[-\s]+', '_', text)
     return text.lower()
 
 
 def load_excel_data():
-    """Charge les donnees depuis le fichier Excel"""
-    wb = load_workbook(EXCEL_FILE)
-    ws = wb.active
+    """Charge les donnees depuis les fichiers Excel du dossier notes/
+    Chaque fichier = 1 matiere. Les eleves sont fusionnes par prenom+nom."""
+    students_map = {}  # cle = (prenom_lower, nom_lower) -> student dict
 
-    # Lire les en-tetes
-    headers = []
-    for cell in ws[1]:
-        headers.append(cell.value)
-
-    # Lire les donnees des eleves
-    students = []
-    for row in ws.iter_rows(min_row=2, values_only=True):
-        if row[0] is None:  # Ligne vide
+    for matiere in MATIERES_PAES:
+        excel_file = matiere.get("excel_file")
+        if not excel_file:
             continue
 
-        student = {
-            "nom": row[0],
-            "prenom": row[1],
-            "date_naissance": row[2],
-            "email": row[3],
-            "choix_parcoursup": row[4],
-            "notes": {}
-        }
+        filepath = NOTES_DIR / excel_file
+        if not filepath.exists():
+            print(f"  [WARN] Fichier non trouvé: {filepath}")
+            continue
 
-        # Lire les notes (colonnes 5 a 13, index 0-based: 5-13)
-        note_columns = ["Biochimie", "Biologie Cellulaire", "Biostatistiques",
-                       "Chimie 1", "Chimie 2", "Maths", "Physique",
-                       "Physique Biophysique", "SVT"]
+        wb = load_workbook(filepath)
+        ws = wb.active
 
-        for i, col_name in enumerate(note_columns):
-            col_index = 5 + i  # Les notes commencent a la colonne 6 (index 5)
-            if col_index < len(row):
-                student["notes"][col_name] = row[col_index]
+        # Lire les en-tetes pour identifier les colonnes
+        headers = []
+        for cell in ws[1]:
+            headers.append(str(cell.value or "").strip())
 
-        students.append(student)
+        # Trouver les index des colonnes
+        def find_col(names):
+            for name in names:
+                for i, h in enumerate(headers):
+                    if h.lower() == name.lower():
+                        return i
+            return None
 
-    return students
+        col_prenom = find_col(["Prenom", "Prénom"])
+        col_nom = find_col(["Nom"])
+        col_email = find_col(["Email", "Mail"])
+        col_note = find_col(["Note"])
+
+        if col_prenom is None or col_nom is None:
+            print(f"  [WARN] Colonnes Prenom/Nom non trouvées dans {excel_file}: {headers}")
+            continue
+
+        for row in ws.iter_rows(min_row=2, values_only=True):
+            if row[col_nom] is None:
+                continue
+
+            prenom = capitalize_name(str(row[col_prenom] or ""))
+            nom = capitalize_name(str(row[col_nom] or ""))
+            email = str(row[col_email] or "").strip() if col_email is not None else ""
+
+            if not prenom and not nom:
+                continue
+
+            key = (prenom.lower(), nom.lower())
+
+            if key not in students_map:
+                students_map[key] = {
+                    "nom": nom,
+                    "prenom": prenom,
+                    "date_naissance": None,
+                    "email": email,
+                    "notes": {}
+                }
+            elif email and not students_map[key]["email"]:
+                students_map[key]["email"] = email
+
+            # Parser la note
+            note_raw = row[col_note] if col_note is not None else None
+            note_value = parse_note_string(note_raw)
+            students_map[key]["notes"][matiere["nom"]] = note_value
+
+        wb.close()
+
+    # Charger les dates de naissance depuis Identites.xlsx
+    identites_file = BASE_DIR / "Identites.xlsx"
+    if identites_file.exists():
+        print(f"  [OK] Chargement des identités depuis Identites.xlsx...")
+        wb_id = load_workbook(identites_file)
+        ws_id = wb_id.active
+        matched = 0
+
+        for row in ws_id.iter_rows(min_row=2, values_only=True):
+            if row[2] is None or row[3] is None:
+                continue
+            nom_id = capitalize_name(str(row[2] or ""))
+            prenom_id = capitalize_name(str(row[3] or ""))
+            date_naiss = row[4]  # datetime object
+            key = (prenom_id.lower(), nom_id.lower())
+
+            if key in students_map:
+                students_map[key]["date_naissance"] = date_naiss
+                matched += 1
+
+        wb_id.close()
+        print(f"  [OK] {matched} dates de naissance associées")
+    else:
+        print(f"  [WARN] Fichier Identites.xlsx non trouvé")
+
+    return list(students_map.values())
 
 
-def calculate_class_stats(students):
-    """Calcule les statistiques de classe pour chaque matiere"""
+def load_identity_choices():
+    """Charge Identites.xlsx et retourne un dict pour enrichir l'index.
+    Retourne: {(prenom_lower, nom_lower): {"date_naissance": ..., "choix": ...}}
+    choix = "Bulletin PAES" | "Bulletin Linova"
+    """
+    for filename in ("identity.xlsx", "Identites.xlsx"):
+        filepath = BASE_DIR / filename
+        if not filepath.exists():
+            continue
+        wb = load_workbook(filepath)
+        ws = wb.active
+        out = {}
+        for row in ws.iter_rows(min_row=2, values_only=True):
+            if len(row) <= 3 or (row[2] is None and row[3] is None):
+                continue
+            nom = capitalize_name(str(row[2] or ""))
+            prenom = capitalize_name(str(row[3] or ""))
+            if not nom and not prenom:
+                continue
+            key = (prenom.lower(), nom.lower())
+            date_naiss = row[4] if len(row) > 4 else None
+            parcoursup = str(row[5] or "").strip() if len(row) > 5 else ""
+            if "PAES" in parcoursup or "Diploma" in parcoursup:
+                choix = "Bulletin PAES"
+            elif "Linova" in parcoursup or "BTS" in parcoursup:
+                choix = "Bulletin Linova"
+            else:
+                choix = "Formulaire non rempli"
+            out[key] = {"date_naissance": date_naiss, "choix": choix}
+        wb.close()
+        print(f"  [OK] Identités chargées depuis {filename}: {len(out)} élèves")
+        return out
+    print(f"  [WARN] Aucun fichier identité trouvé (identity.xlsx / Identites.xlsx)")
+    return {}
+
+
+def calculate_class_stats(students, matieres_config, notes_key_fn=None):
+    """Calcule les statistiques de classe pour chaque matiere.
+    notes_key_fn: fonction qui prend une matiere et retourne la cle dans student['notes']
+    """
+    if notes_key_fn is None:
+        notes_key_fn = lambda m: m["nom"]
+
     stats = {}
 
-    for matiere in MATIERES_CONFIG:
-        col_name = matiere["col_excel"]
+    for matiere in matieres_config:
+        note_key = notes_key_fn(matiere)
         notes = []
 
         for student in students:
-            raw_note = student["notes"].get(col_name)
+            raw_note = student["notes"].get(note_key)
             adjusted = adjust_grade(raw_note)
             if adjusted is not None:
                 notes.append(adjusted)
 
         if notes:
-            stats[col_name] = {
+            stats[matiere["nom"]] = {
                 "moyenne": sum(notes) / len(notes),
                 "min": min(notes),
                 "max": max(notes)
             }
         else:
-            stats[col_name] = {
+            stats[matiere["nom"]] = {
                 "moyenne": None,
                 "min": None,
                 "max": None
@@ -265,45 +499,94 @@ def calculate_class_stats(students):
     return stats
 
 
-def generate_bulletin_html(student, class_stats, template):
+def calculate_class_stats_from_adjusted(students, matieres_config, notes_key_fn=None):
+    """Calcule les statistiques de classe a partir des notes PRE-CALCULEES (adjusted_notes).
+    notes_key_fn: fonction qui retourne la cle dans student['adjusted_notes']
+    """
+    if notes_key_fn is None:
+        notes_key_fn = lambda m: m["nom"]
+
+    stats = {}
+
+    for matiere in matieres_config:
+        note_key = notes_key_fn(matiere)
+        notes = []
+
+        for student in students:
+            adj = student.get("adjusted_notes", {}).get(note_key)
+            if adj is not None:
+                notes.append(adj)
+
+        if notes:
+            stats[matiere["nom"]] = {
+                "moyenne": sum(notes) / len(notes),
+                "min": min(notes),
+                "max": max(notes)
+            }
+        else:
+            stats[matiere["nom"]] = {
+                "moyenne": None,
+                "min": None,
+                "max": None
+            }
+
+    return stats
+
+
+def generate_bulletin_html(student, class_stats, template, profil, matieres_config,
+                           appreciations_dict, notes_key_fn=None):
     """Genere le HTML d'un bulletin pour un eleve"""
+    if notes_key_fn is None:
+        notes_key_fn = lambda m: m["nom"]
+
     html = template
 
     # Informations etablissement
-    html = html.replace("{{NOM_ETABLISSEMENT}}", ETABLISSEMENT["nom"])
-    html = html.replace("{{ADRESSE_ETABLISSEMENT}}", ETABLISSEMENT["adresse"])
-    html = html.replace("{{CODE_POSTAL}}", ETABLISSEMENT["code_postal"])
-    html = html.replace("{{VILLE}}", ETABLISSEMENT["ville"])
-    html = html.replace("{{ANNEE_SCOLAIRE}}", ETABLISSEMENT["annee_scolaire"])
-    html = html.replace("{{CLASSE}}", ETABLISSEMENT["classe"])
-    html = html.replace("{{CHARGE_ETUDES}}", ETABLISSEMENT["charge_etudes"])
-    html = html.replace("{{SEMESTRE}}", ETABLISSEMENT["semestre"])
+    html = html.replace("{{NOM_ETABLISSEMENT}}", profil["nom"])
+    html = html.replace("{{ADRESSE_ETABLISSEMENT}}", profil["adresse"])
+    html = html.replace("{{CODE_POSTAL}}", profil["code_postal"])
+    html = html.replace("{{VILLE}}", profil["ville"])
+    html = html.replace("{{ANNEE_SCOLAIRE}}", profil["annee_scolaire"])
+    html = html.replace("{{CLASSE}}", profil["classe"])
+    html = html.replace("{{CHARGE_ETUDES}}", profil["charge_etudes"])
+    html = html.replace("{{SEMESTRE}}", profil["semestre"])
+    html = html.replace("{{LOGO_FILE}}", profil["logo"])
+    html = html.replace("{{TAMPON_FILE}}", profil["tampon"])
 
     # Informations eleve
     html = html.replace("{{PRENOM_ELEVE}}", str(student["prenom"] or ""))
     html = html.replace("{{NOM_ELEVE}}", str(student["nom"] or ""))
-    html = html.replace("{{DATE_NAISSANCE}}", format_date(student["date_naissance"]))
+    date_naiss = format_date(student.get("date_naissance"))
+    if date_naiss:
+        html = html.replace("{{DATE_NAISSANCE}}", date_naiss)
+    else:
+        # Pas de date de naissance : supprimer toute la ligne "Né le : ..."
+        html = html.replace('<div><span class="label">Né le : </span><span class="value field">{{DATE_NAISSANCE}}</span></div>', '')
 
     # Notes et appreciations par matiere
     student_notes = []
 
-    for i, matiere in enumerate(MATIERES_CONFIG, start=1):
-        col_name = matiere["col_excel"]
-        raw_note = student["notes"].get(col_name)
-        adjusted_note = adjust_grade(raw_note)
+    for i, matiere in enumerate(matieres_config, start=1):
+        note_key = notes_key_fn(matiere)
+        # Utiliser les notes pre-calculees si disponibles (pour coherence PAES/Linova)
+        adjusted_note = student.get("adjusted_notes", {}).get(note_key)
+        if adjusted_note is None:
+            raw_note = student["notes"].get(note_key)
+            adjusted_note = adjust_grade(raw_note)
 
         html = html.replace(f"{{{{MATIERE_{i}}}}}", matiere["nom"])
         html = html.replace(f"{{{{ENSEIGNANT_{i}}}}}", matiere["enseignant"])
         html = html.replace(f"{{{{MOY_ELEVE_{i}}}}}", format_note(adjusted_note))
 
         # Statistiques de classe
-        stats = class_stats.get(col_name, {})
+        stats = class_stats.get(matiere["nom"], {})
         html = html.replace(f"{{{{MOY_CLASSE_{i}}}}}", format_note(stats.get("moyenne")))
         html = html.replace(f"{{{{NOTE_MIN_{i}}}}}", format_note(stats.get("min")))
         html = html.replace(f"{{{{NOTE_MAX_{i}}}}}", format_note(stats.get("max")))
 
         # Appreciation specifique a la matiere
-        html = html.replace(f"{{{{APPRECIATION_{i}}}}}", get_appreciation(adjusted_note, matiere["nom"]))
+        html = html.replace(f"{{{{APPRECIATION_{i}}}}}",
+                           get_appreciation(adjusted_note, matiere["nom"], appreciations_dict))
 
         if adjusted_note is not None:
             student_notes.append(adjusted_note)
@@ -316,9 +599,8 @@ def generate_bulletin_html(student, class_stats, template):
 
     # Calculer moyenne generale de la classe
     all_class_moyennes = []
-    for matiere in MATIERES_CONFIG:
-        col_name = matiere["col_excel"]
-        stats = class_stats.get(col_name, {})
+    for matiere in matieres_config:
+        stats = class_stats.get(matiere["nom"], {})
         if stats.get("moyenne") is not None:
             all_class_moyennes.append(stats["moyenne"])
 
@@ -338,32 +620,55 @@ def generate_bulletin_html(student, class_stats, template):
     return html
 
 
-def generate_index_html(students):
-    """Genere la page index.html avec la liste des eleves"""
+def generate_index_html(students, profil_paes, profil_linova):
+    """Genere la page index.html avec la liste des eleves et acces aux deux types de bulletins"""
 
-    # Trier les eleves par nom de famille
     sorted_students = sorted(students, key=lambda s: (s["nom"] or "", s["prenom"] or ""))
 
     rows = []
     for student in sorted_students:
-        filename = f"bulletin_{sanitize_filename(student['prenom'])}_{sanitize_filename(student['nom'])}.pdf"
-        pdf_path = f"bulletins_pdf/{filename}"
+        filename_base = f"bulletin_{sanitize_filename(student['prenom'])}_{sanitize_filename(student['nom'])}"
+        pdf_paes = f"bulletins_pdf_paes/{filename_base}.pdf"
+        pdf_linova = f"bulletins_pdf_linova/{filename_base}.pdf"
+
+        date_naiss = format_date(student.get("date_naissance"))
+        if not date_naiss:
+            date_naiss_html = '<span class="no-date">Formulaire non rempli</span>'
+        else:
+            date_naiss_html = date_naiss
+
+        choix = student.get("choix", "Formulaire non rempli")
 
         row = f"""
             <tr>
                 <td>{student['prenom'] or ''}</td>
                 <td>{student['nom'] or ''}</td>
-                <td><a href="mailto:{student['email'] or ''}">{student['email'] or ''}</a></td>
-                <td class="pdf-cell">
-                    <a href="{pdf_path}" class="btn-pdf" target="_blank" title="Voir le bulletin">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                <td><a href="mailto:{student.get('email') or ''}">{student.get('email') or ''}</a></td>
+                <td>{date_naiss_html}</td>
+                <td class="choix-cell">{choix}</td>
+                <td class="pdf-cell pdf-cell-paes">
+                    <a href="{pdf_paes}" class="btn-pdf btn-paes" target="_blank" title="Bulletin PAES">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
                             <path d="M14 14V4.5L9.5 0H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2zM9.5 3A1.5 1.5 0 0 0 11 4.5h2V14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h5.5v2z"/>
-                            <path d="M4.603 14.087a.81.81 0 0 1-.438-.42c-.195-.388-.13-.776.08-1.102.198-.307.526-.568.897-.787a7.68 7.68 0 0 1 1.482-.645 19.697 19.697 0 0 0 1.062-2.227 7.269 7.269 0 0 1-.43-1.295c-.086-.4-.119-.796-.046-1.136.075-.354.274-.672.65-.823.192-.077.4-.12.602-.077a.7.7 0 0 1 .477.365c.088.164.12.356.127.538.007.188-.012.396-.047.614-.084.51-.27 1.134-.52 1.794a10.954 10.954 0 0 0 .98 1.686 5.753 5.753 0 0 1 1.334.05c.364.066.734.195.96.465.12.144.193.32.2.518.007.192-.047.382-.138.563a1.04 1.04 0 0 1-.354.416.856.856 0 0 1-.51.138c-.331-.014-.654-.196-.933-.417a5.712 5.712 0 0 1-.911-.95 11.651 11.651 0 0 0-1.997.406 11.307 11.307 0 0 1-1.02 1.51c-.292.35-.609.656-.927.787a.793.793 0 0 1-.58.029z"/>
                         </svg>
-                        PDF
+                        PAES
                     </a>
-                    <a href="{pdf_path}" class="btn-download" download title="Télécharger">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                    <a href="{pdf_paes}" class="btn-download" download="{filename_base}_paes.pdf" title="Télécharger PAES">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
+                            <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/>
+                        </svg>
+                    </a>
+                </td>
+                <td class="pdf-cell pdf-cell-linova">
+                    <a href="{pdf_linova}" class="btn-pdf btn-linova" target="_blank" title="Bulletin Linova">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M14 14V4.5L9.5 0H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2zM9.5 3A1.5 1.5 0 0 0 11 4.5h2V14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h5.5v2z"/>
+                        </svg>
+                        Linova
+                    </a>
+                    <a href="{pdf_linova}" class="btn-download btn-dl-linova" download="{filename_base}_linova.pdf" title="Télécharger Linova">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
                             <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
                             <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/>
                         </svg>
@@ -372,12 +677,15 @@ def generate_index_html(students):
             </tr>"""
         rows.append(row)
 
+    nb_students = len(students)
+    nb_matieres = len(MATIERES_PAES)
+
     index_html = f"""<!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bulletins Scolaires - {ETABLISSEMENT['nom']}</title>
+    <title>Bulletins Scolaires - {profil_paes['nom']} / {profil_linova['nom']}</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap');
 
@@ -395,7 +703,7 @@ def generate_index_html(students):
         }}
 
         .container {{
-            max-width: 1200px;
+            max-width: 1400px;
             margin: 0 auto;
             background: white;
             border-radius: 12px;
@@ -506,41 +814,80 @@ def generate_index_html(students):
 
         .pdf-cell {{
             display: flex;
-            gap: 8px;
+            gap: 6px;
             align-items: center;
         }}
 
         .btn-pdf, .btn-download {{
             display: inline-flex;
             align-items: center;
-            gap: 6px;
-            padding: 8px 12px;
+            gap: 4px;
+            padding: 6px 10px;
             border-radius: 6px;
-            font-size: 12px;
+            font-size: 11px;
             font-weight: 600;
             text-decoration: none;
             transition: all 0.2s;
         }}
 
-        .btn-pdf {{
+        .btn-paes {{
             background: #e74c3c;
             color: white;
         }}
 
-        .btn-pdf:hover {{
+        .btn-paes:hover {{
             background: #c0392b;
+            text-decoration: none;
+        }}
+
+        .btn-linova {{
+            background: #2980b9;
+            color: white;
+        }}
+
+        .btn-linova:hover {{
+            background: #1f6fa3;
             text-decoration: none;
         }}
 
         .btn-download {{
             background: #27ae60;
             color: white;
-            padding: 8px;
+            padding: 6px;
         }}
 
         .btn-download:hover {{
             background: #1e8449;
             text-decoration: none;
+        }}
+
+        .btn-dl-linova {{
+            background: #16a085;
+        }}
+
+        .btn-dl-linova:hover {{
+            background: #0e7e68;
+        }}
+
+        .no-date {{
+            color: #e74c3c;
+            font-size: 10px;
+            font-style: italic;
+        }}
+
+        .choix-cell {{
+            font-size: 12px;
+            font-weight: 500;
+        }}
+
+        .pdf-cell-paes {{
+            min-width: 100px;
+            white-space: nowrap;
+        }}
+
+        .pdf-cell-linova {{
+            min-width: 100px;
+            white-space: nowrap;
         }}
 
         .no-results {{
@@ -575,15 +922,15 @@ def generate_index_html(students):
 <body>
     <div class="container">
         <div class="header">
-            <h1>Bulletins du {ETABLISSEMENT['semestre']}</h1>
-            <p>{ETABLISSEMENT['nom']} - Année scolaire {ETABLISSEMENT['annee_scolaire']} - Classe {ETABLISSEMENT['classe']}</p>
+            <h1>Bulletins Annuels</h1>
+            <p>{profil_paes['nom']} / {profil_linova['nom']} - Année scolaire {profil_paes['annee_scolaire']} - Classe {profil_paes['classe']}</p>
             <div class="stats">
                 <div class="stat">
-                    <div class="stat-value">{len(students)}</div>
+                    <div class="stat-value">{nb_students}</div>
                     <div class="stat-label">Élèves</div>
                 </div>
                 <div class="stat">
-                    <div class="stat-value">{len(MATIERES_CONFIG)}</div>
+                    <div class="stat-value">{nb_matieres}</div>
                     <div class="stat-label">Matières</div>
                 </div>
             </div>
@@ -601,7 +948,10 @@ def generate_index_html(students):
                         <th>Prénom</th>
                         <th>Nom</th>
                         <th>Email</th>
-                        <th>Bulletin</th>
+                        <th>Date de naissance</th>
+                        <th>Choix</th>
+                        <th>Bulletin PAES</th>
+                        <th>Bulletin Linova</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -640,55 +990,139 @@ def generate_index_html(students):
 def main():
     print("=" * 60)
     print("GENERATEUR DE BULLETINS SCOLAIRES")
+    print("PAES (Diploma Santé) + Linova Education")
     print("=" * 60)
 
     # Creer les dossiers de sortie
-    HTML_OUTPUT_DIR.mkdir(exist_ok=True)
-    PDF_OUTPUT_DIR.mkdir(exist_ok=True)
+    html_paes_dir = BASE_DIR / "bulletins_html_paes"
+    pdf_paes_dir = BASE_DIR / "bulletins_pdf_paes"
+    html_linova_dir = BASE_DIR / "bulletins_html_linova"
+    pdf_linova_dir = BASE_DIR / "bulletins_pdf_linova"
+
+    for d in [html_paes_dir, pdf_paes_dir, html_linova_dir, pdf_linova_dir]:
+        d.mkdir(exist_ok=True)
+
     print(f"\n[OK] Dossiers de sortie créés")
 
-    # Charger le template
-    print(f"[...] Chargement du template...")
+    # Charger les templates
+    print(f"[...] Chargement des templates...")
     with open(TEMPLATE_FILE, 'r', encoding='utf-8') as f:
         template = f.read()
-    print(f"[OK] Template chargé: {TEMPLATE_FILE}")
+    with open(TEMPLATE_LINOVA_FILE, 'r', encoding='utf-8') as f:
+        template_linova = f.read()
+    print(f"[OK] Templates chargés: PAES + Linova (1 page)")
 
     # Charger les donnees Excel
-    print(f"[...] Chargement des données Excel...")
+    print(f"[...] Chargement des données Excel depuis {NOTES_DIR}...")
     students = load_excel_data()
-    print(f"[OK] {len(students)} élèves chargés depuis {EXCEL_FILE}")
+    print(f"[OK] {len(students)} élèves chargés")
 
-    # Calculer les statistiques de classe
-    print(f"[...] Calcul des statistiques de classe...")
-    class_stats = calculate_class_stats(students)
-    print(f"[OK] Statistiques calculées pour {len(class_stats)} matières")
+    if not students:
+        print("[ERREUR] Aucun élève trouvé. Vérifiez les fichiers Excel dans le dossier notes/")
+        return
+
+    # Enrichir les élèves avec les données du formulaire identité (date + choix)
+    print(f"[...] Chargement du formulaire identité...")
+    identity_dict = load_identity_choices()
+    enriched_students = []
+    for s in students:
+        key = ((s.get("prenom") or "").lower(), (s.get("nom") or "").lower())
+        if key in identity_dict:
+            enriched_students.append({
+                **s,
+                "date_naissance": identity_dict[key]["date_naissance"],
+                "choix": identity_dict[key]["choix"],
+            })
+        else:
+            enriched_students.append({
+                **s,
+                "choix": "Formulaire non rempli",
+            })
+
+    # Vérifier s'il faut nettoyer (première exécution avec --clean ou --force-clean)
+    # ou si on reprend après un crash (bulletins existants gardés)
+    import sys
+    if "--clean" in sys.argv:
+        print(f"[...] Suppression de tous les anciens bulletins (--clean)...")
+        for d in [html_paes_dir, pdf_paes_dir, html_linova_dir, pdf_linova_dir]:
+            if d.exists():
+                for f in d.glob("*"):
+                    if f.is_file():
+                        f.unlink()
+        print(f"[OK] Anciens bulletins supprimés")
+    else:
+        existing_paes = len(list(pdf_paes_dir.glob("*.pdf"))) if pdf_paes_dir.exists() else 0
+        existing_linova = len(list(pdf_linova_dir.glob("*.pdf"))) if pdf_linova_dir.exists() else 0
+        print(f"[INFO] Reprise : {existing_paes} PAES et {existing_linova} Linova déjà générés")
+
+    # Pre-calculer les notes ajustees UNE SEULE FOIS par eleve/matiere PAES
+    # pour que PAES et Linova aient exactement les memes moyennes
+    # Seed fixe pour que les notes soient identiques si on relance le script
+    print(f"[...] Pré-calcul des notes ajustées (identiques PAES/Linova)...")
+    random.seed(42)
+    for student in enriched_students:
+        adjusted = {}
+        for matiere in MATIERES_PAES:
+            raw_note = student["notes"].get(matiere["nom"])
+            adjusted[matiere["nom"]] = adjust_grade(raw_note)
+        student["adjusted_notes"] = adjusted
+    print(f"[OK] Notes ajustées pré-calculées")
+
+    # Calculer les statistiques de classe pour PAES (avec notes pre-calculees)
+    print(f"[...] Calcul des statistiques de classe PAES...")
+    class_stats_paes = calculate_class_stats_from_adjusted(enriched_students, MATIERES_PAES)
+    print(f"[OK] Statistiques PAES calculées")
+
+    # Calculer les statistiques de classe pour Linova (memes notes via mapping source_paes)
+    print(f"[...] Calcul des statistiques de classe Linova...")
+    linova_key_fn = lambda m: m.get("source_paes", m["nom"])
+    class_stats_linova = calculate_class_stats_from_adjusted(enriched_students, MATIERES_LINOVA, notes_key_fn=linova_key_fn)
+    print(f"[OK] Statistiques Linova calculées")
 
     # Generer les bulletins
     print(f"\n[...] Génération des bulletins...")
 
-    for i, student in enumerate(students, start=1):
+    for i, student in enumerate(enriched_students, start=1):
         prenom = student['prenom'] or 'inconnu'
         nom = student['nom'] or 'inconnu'
         filename_base = f"bulletin_{sanitize_filename(prenom)}_{sanitize_filename(nom)}"
 
-        # Generer le HTML
-        html_content = generate_bulletin_html(student, class_stats, template)
-        html_path = HTML_OUTPUT_DIR / f"{filename_base}.html"
+        # === Bulletin PAES ===
+        html_path_paes = html_paes_dir / f"{filename_base}.html"
+        pdf_path_paes = pdf_paes_dir / f"{filename_base}.pdf"
+        if not pdf_path_paes.exists():
+            html_paes = generate_bulletin_html(
+                student, class_stats_paes, template,
+                PROFIL_PAES, MATIERES_PAES, APPRECIATIONS_PAES
+            )
+            with open(html_path_paes, 'w', encoding='utf-8') as f:
+                f.write(html_paes)
+            HTML(string=html_paes, base_url=str(BASE_DIR)).write_pdf(pdf_path_paes)
+            del html_paes
+            gc.collect()
 
-        with open(html_path, 'w', encoding='utf-8') as f:
-            f.write(html_content)
+        # === Bulletin Linova (meme mise en page A4 que PAES) ===
+        html_path_linova = html_linova_dir / f"{filename_base}.html"
+        pdf_path_linova = pdf_linova_dir / f"{filename_base}.pdf"
+        if not pdf_path_linova.exists():
+            html_linova = generate_bulletin_html(
+                student, class_stats_linova, template_linova,
+                PROFIL_LINOVA, MATIERES_LINOVA, APPRECIATIONS_LINOVA,
+                notes_key_fn=linova_key_fn
+            )
+            with open(html_path_linova, 'w', encoding='utf-8') as f:
+                f.write(html_linova)
+            HTML(string=html_linova, base_url=str(BASE_DIR)).write_pdf(pdf_path_linova)
+            del html_linova
+            gc.collect()
 
-        # Convertir en PDF
-        pdf_path = PDF_OUTPUT_DIR / f"{filename_base}.pdf"
-        HTML(string=html_content, base_url=str(BASE_DIR)).write_pdf(pdf_path)
+        print(f"  [{i}/{len(enriched_students)}] {prenom} {nom} OK")
 
-        print(f"  [{i}/{len(students)}] {prenom} {nom} - OK")
+    print(f"\n[OK] {len(enriched_students)} x 2 bulletins générés ({len(enriched_students)} PAES + {len(enriched_students)} Linova)")
 
-    print(f"\n[OK] {len(students)} bulletins générés")
-
-    # Generer l'index HTML
+    # Generer l'index HTML (tous les élèves des notes, enrichis avec choix + date)
     print(f"\n[...] Génération de la plateforme index.html...")
-    index_html = generate_index_html(students)
+    index_html = generate_index_html(enriched_students, PROFIL_PAES, PROFIL_LINOVA)
     index_path = BASE_DIR / "index.html"
 
     with open(index_path, 'w', encoding='utf-8') as f:
@@ -700,9 +1134,11 @@ def main():
     print("\n" + "=" * 60)
     print("RÉSUMÉ")
     print("=" * 60)
-    print(f"  Bulletins HTML: {HTML_OUTPUT_DIR}")
-    print(f"  Bulletins PDF:  {PDF_OUTPUT_DIR}")
-    print(f"  Plateforme:     {index_path}")
+    print(f"  Bulletins PAES HTML:   {html_paes_dir}")
+    print(f"  Bulletins PAES PDF:    {pdf_paes_dir}")
+    print(f"  Bulletins Linova HTML: {html_linova_dir}")
+    print(f"  Bulletins Linova PDF:  {pdf_linova_dir}")
+    print(f"  Plateforme:            {index_path}")
     print(f"\nOuvrez index.html dans votre navigateur pour accéder aux bulletins.")
     print("=" * 60)
 

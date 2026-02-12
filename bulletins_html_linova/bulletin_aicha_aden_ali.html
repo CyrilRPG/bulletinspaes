@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bulletin Linova</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap');
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        @page {
+            size: A4;
+            margin: 0;
+        }
+
+        body {
+            font-family: 'Open Sans', Arial, sans-serif;
+            font-size: 11.4px;
+            line-height: 1.35;
+            color: #333;
+            background: #f5f5f5;
+        }
+
+        .page {
+            width: 210mm;
+            height: 297mm;
+            padding: 12mm 15mm;
+            margin: 0 auto;
+            background: white;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        @media print {
+            body {
+                background: white;
+            }
+            .page {
+                width: 100%;
+                height: 297mm;
+                padding: 10mm 12mm;
+                margin: 0;
+                box-shadow: none;
+                overflow: hidden;
+            }
+        }
+
+        /* Header avec logo */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 14px;
+        }
+
+        .logo-container {
+            width: 170px;
+            height: 65px;
+        }
+
+        .logo-container img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+
+        .document-title {
+            text-align: center;
+            flex: 1;
+            padding-top: 14px;
+        }
+
+        .document-title h1 {
+            font-size: 19px;
+            font-weight: 700;
+            color: #333;
+        }
+
+        /* Infos établissement et élève */
+        .info-section {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 14px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .etablissement-info {
+            font-size: 10.8px;
+            line-height: 1.5;
+        }
+
+        .etablissement-info .nom {
+            font-weight: 700;
+            color: #2c3e50;
+            font-size: 12px;
+        }
+
+        .eleve-info {
+            text-align: right;
+        }
+
+        .eleve-info .label {
+            color: #666;
+        }
+
+        .eleve-info .value {
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        /* Infos scolarité */
+        .scolarite-info {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-bottom: 14px;
+        }
+
+        .scolarite-item {
+            display: flex;
+            gap: 6px;
+        }
+
+        .scolarite-item .label {
+            color: #666;
+            font-size: 10.8px;
+        }
+
+        .scolarite-item .value {
+            font-weight: 600;
+            color: #2c3e50;
+            font-size: 10.8px;
+        }
+
+        /* Tableau des notes */
+        .notes-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 12px;
+            font-size: 10px;
+        }
+
+        .notes-table th {
+            background: #f8f9fa;
+            padding: 7px 5px;
+            text-align: left;
+            font-weight: 600;
+            color: #2c3e50;
+            border-bottom: 2px solid #dee2e6;
+            font-size: 9.5px;
+        }
+
+        .notes-table th.center {
+            text-align: center;
+        }
+
+        .notes-table td {
+            padding: 6px 5px;
+            border-bottom: 1px solid #eee;
+            vertical-align: middle;
+        }
+
+        .notes-table td.center {
+            text-align: center;
+        }
+
+        .notes-table td.matiere {
+            font-weight: 600;
+            color: #2c3e50;
+            font-size: 9px;
+            max-width: 160px;
+            word-wrap: break-word;
+        }
+
+        .notes-table td.appreciation {
+            font-size: 9.5px;
+            color: #555;
+            max-width: 220px;
+        }
+
+        .notes-table tr:hover {
+            background: #fafbfc;
+        }
+
+        /* Ligne des moyennes générales */
+        .moyenne-generale-row {
+            margin-top: 10px;
+            padding: 10px 14px;
+            background: #f8f9fa;
+            border-radius: 4px;
+            display: flex;
+            justify-content: flex-end;
+            gap: 24px;
+            font-weight: 600;
+        }
+
+        .moyenne-item {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .moyenne-item .label {
+            color: #666;
+            font-size: 10.8px;
+        }
+
+        .moyenne-item .value {
+            font-size: 14.4px;
+            color: #2c3e50;
+            font-weight: 700;
+        }
+
+        /* Section absences */
+        .absences-section {
+            display: flex;
+            gap: 18px;
+            margin: 12px 0;
+            padding: 10px 14px;
+            border: 1px solid #eee;
+            border-radius: 4px;
+        }
+
+        .absences-section .label {
+            font-weight: 600;
+            color: #2c3e50;
+            white-space: nowrap;
+            font-size: 10.8px;
+        }
+
+        .absences-section .value {
+            flex: 1;
+            border-bottom: 1px dotted #ccc;
+            min-height: 18px;
+        }
+
+        .absences-section .visa {
+            color: #666;
+            font-size: 9.5px;
+            font-style: italic;
+            text-align: right;
+        }
+
+        /* Appréciation générale */
+        .appreciation-generale {
+            margin-top: 12px;
+        }
+
+        .appreciation-generale .label {
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 6px;
+            font-size: 10.8px;
+        }
+
+        .appreciation-box {
+            display: flex;
+            gap: 18px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 12px;
+            min-height: 80px;
+        }
+
+        .appreciation-text {
+            flex: 1;
+            font-size: 10.8px;
+            line-height: 1.5;
+            color: #444;
+        }
+
+        .signature-zone {
+            width: 130px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border-left: 1px solid #eee;
+            padding-left: 18px;
+        }
+
+        .tampon-container {
+            width: 120px;
+            height: 85px;
+        }
+
+        .tampon-container img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+
+        /* Classes pour les champs remplaçables */
+        .field {
+            color: inherit;
+        }
+
+        .field-highlight {
+            background: #fff3cd;
+            padding: 0 3px;
+            border-radius: 2px;
+        }
+
+        /* Style pour quand il n'y a pas de note (NN) */
+        .note-nn {
+            color: #999;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <div class="page">
+        <!-- En-tête avec logo et titre -->
+        <div class="header">
+            <div class="logo-container">
+                <img src="logo_linova.png" alt="Logo">
+            </div>
+            <div class="document-title">
+                <h1>Bulletin <span class="field">Annuel</span></h1>
+            </div>
+            <div style="width: 140px;"></div>
+        </div>
+
+        <!-- Informations établissement et élève -->
+        <div class="info-section">
+            <div class="etablissement-info">
+                <div class="nom">Linova Education</div>
+                <div>100 Quai de la Rapée</div>
+                <div>75012 Paris</div>
+            </div>
+            <div class="eleve-info">
+                <div><span class="label">Élève : </span><span class="value field">Aicha Aden Ali</span></div>
+                <div><span class="label">Né le : </span><span class="value field">05/11/2007</span></div>
+            </div>
+        </div>
+
+        <!-- Informations scolarité -->
+        <div class="scolarite-info">
+            <div class="scolarite-item">
+                <span class="label">Année scolaire :</span>
+                <span class="value field">2025/2026</span>
+            </div>
+            <div class="scolarite-item">
+                <span class="label">Classe :</span>
+                <span class="value field">1</span>
+            </div>
+            <div class="scolarite-item">
+                <span class="label">Chargée d'études :</span>
+                <span class="value field">Cyril Robert</span>
+            </div>
+        </div>
+
+        <!-- Tableau des notes -->
+        <table class="notes-table">
+            <thead>
+                <tr>
+                    <th style="width: 130px;">Matière</th>
+                    <th style="width: 70px;">Enseignant</th>
+                    <th class="center" style="width: 40px;">Moy.<br>Élève</th>
+                    <th class="center" style="width: 40px;">Moy.<br>Classe</th>
+                    <th class="center" style="width: 35px;">Min</th>
+                    <th class="center" style="width: 35px;">Max</th>
+                    <th>Appréciation</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td class="matiere">Démarche qualité et organisation opérationnelle au sein du laboratoire de biologie médicale</td>
+                    <td class="field">M. Benramdane</td>
+                    <td class="center field">19,1</td>
+                    <td class="center field">16,2</td>
+                    <td class="center field">9,5</td>
+                    <td class="center field">20,0</td>
+                    <td class="appreciation field">Excellente maîtrise de la démarche qualité en laboratoire. Félicitations pour ce travail remarquable.</td>
+                </tr>
+                <tr>
+                    <td class="matiere">Analyses médicales les plus courantes</td>
+                    <td class="field">M. Descatoire</td>
+                    <td class="center field">17,6</td>
+                    <td class="center field">15,1</td>
+                    <td class="center field">9,2</td>
+                    <td class="center field">20,0</td>
+                    <td class="appreciation field">Maîtrise remarquable des analyses médicales les plus courantes. Travail exemplaire.</td>
+                </tr>
+                <tr>
+                    <td class="matiere">Amélioration des méthodes d'analyse de biologie médicale - Pratiques à visée thérapeutique</td>
+                    <td class="field">M. Descatoire</td>
+                    <td class="center field">18,5</td>
+                    <td class="center field">14,9</td>
+                    <td class="center field">9,5</td>
+                    <td class="center field">20,0</td>
+                    <td class="appreciation field">Excellente compréhension et application des méthodes d'analyse de biologie médicale. Bravo.</td>
+                </tr>
+                <tr>
+                    <td class="matiere">Relations, collaboration et développement professionnels</td>
+                    <td class="field">M. Benramdane</td>
+                    <td class="center field">17,9</td>
+                    <td class="center field">14,1</td>
+                    <td class="center field">9,5</td>
+                    <td class="center field">19,4</td>
+                    <td class="appreciation field">Excellente maîtrise des compétences relationnelles et professionnelles. Félicitations.</td>
+                </tr>
+                <tr>
+                    <td class="matiere">Prélèvements de sang et d'autres échantillons biologiques / Culture générale et expression</td>
+                    <td class="field">Aurore Pottier</td>
+                    <td class="center field">17,6</td>
+                    <td class="center field">16,4</td>
+                    <td class="center field">9,6</td>
+                    <td class="center field">20,0</td>
+                    <td class="appreciation field">Excellents résultats en prélèvements et culture générale. Travail remarquable et rigoureux.</td>
+                </tr>
+                <tr>
+                    <td class="matiere">Anglais</td>
+                    <td class="field">Hanna Charbit</td>
+                    <td class="center field">18,4</td>
+                    <td class="center field">16,2</td>
+                    <td class="center field">9,6</td>
+                    <td class="center field">19,8</td>
+                    <td class="appreciation field">Excellente maîtrise de l'anglais. Résultats impressionnants, félicitations.</td>
+                </tr>
+                <tr>
+                    <td class="matiere">SVT</td>
+                    <td class="field">M. Descatoire</td>
+                    <td class="center field">11,9</td>
+                    <td class="center field">14,6</td>
+                    <td class="center field">9,0</td>
+                    <td class="center field">20,0</td>
+                    <td class="appreciation field">Niveau correct en SVT. Poursuivez vos efforts pour améliorer vos résultats.</td>
+                </tr>
+                <tr>
+                    <td class="matiere">Mathématiques</td>
+                    <td class="field">MOKRANE Zahia</td>
+                    <td class="center field">11,5</td>
+                    <td class="center field">13,5</td>
+                    <td class="center field">9,5</td>
+                    <td class="center field">20,0</td>
+                    <td class="appreciation field">Niveau satisfaisant en mathématiques. Continuez à pratiquer pour progresser.</td>
+                </tr>
+                <tr>
+                    <td class="matiere">Physique-Chimie</td>
+                    <td class="field">MOKRANE Zahia</td>
+                    <td class="center field">13,7</td>
+                    <td class="center field">14,5</td>
+                    <td class="center field">9,6</td>
+                    <td class="center field">20,0</td>
+                    <td class="appreciation field">Bonne assimilation des lois de physique-chimie. Continuez sur cette lancée positive.</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <!-- Moyennes générales -->
+        <div class="moyenne-generale-row">
+            <div class="moyenne-item">
+                <span class="label">Moyennes générales :</span>
+            </div>
+            <div class="moyenne-item">
+                <span class="label">Élève</span>
+                <span class="value field">16,2</span>
+            </div>
+            <div class="moyenne-item">
+                <span class="label">Classe</span>
+                <span class="value field">15,0</span>
+            </div>
+        </div>
+
+        <!-- Section absences -->
+        <div class="absences-section">
+            <span class="label">Absences, vie scolaire :</span>
+            <span class="value field">RAS</span>
+            <span class="visa">Visa du chef d'établissement ou de son délégué</span>
+        </div>
+
+        <!-- Appréciation générale -->
+        <div class="appreciation-generale">
+            <div class="label">Appréciation générale :</div>
+            <div class="appreciation-box">
+                <div class="appreciation-text field">
+                    Aicha a fourni un travail remarquable tout au long de l'année. Félicitations pour ces excellents résultats.
+                </div>
+                <div class="signature-zone">
+                    <div class="tampon-container">
+                        <img src="tampon_linova.jpeg" alt="Tampon">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
