@@ -81,10 +81,7 @@ MATIERES_LINOVA = [
      "source_paes": "Physique", "enseignant": "MOKRANE Zahia"},
 ]
 
-<<<<<<< HEAD
 
-=======
->>>>>>> 508129f4055a5323f147a06ff333a59de632ac24
 # Appreciations par matiere PAES
 APPRECIATIONS_PAES = {
     "Biochimie": {
@@ -225,7 +222,6 @@ NOTES_DIR = BASE_DIR / "notes"
 TEMPLATE_FILE = BASE_DIR / "bulletin_template.html"
 TEMPLATE_LINOVA_FILE = BASE_DIR / "bulletin_template_linova.html"
 
-<<<<<<< HEAD
 # === NOUVEAUX RESULTATS ===
 NOUVEAUX_RESULTATS_DIR = BASE_DIR / "nouveauxresultats"
 
@@ -236,9 +232,6 @@ NOUVEAUX_RESULT_FILES = [
     {"file": "Resultats-CB1 général - Chimie.xlsx", "paes_matiere": "Chimie Médecine"},
     {"file": "Resultats-CB1 général - Physique.xlsx", "paes_matiere": "Physique"},
 ]
-
-=======
->>>>>>> 508129f4055a5323f147a06ff333a59de632ac24
 
 def adjust_grade(note):
     """Applique la formule f(x) = 0.57x + 8.74, plafonnee a 20
@@ -338,7 +331,6 @@ def capitalize_name(name):
     return ' '.join(result)
 
 
-<<<<<<< HEAD
 def normalize_key(name):
     """Normalise un nom pour comparaison: minuscules, sans accents, espaces/tirets unifies"""
     if not name:
@@ -355,8 +347,6 @@ def make_student_key(prenom, nom):
     return (normalize_key(prenom), normalize_key(nom))
 
 
-=======
->>>>>>> 508129f4055a5323f147a06ff333a59de632ac24
 def sanitize_filename(text):
     """Nettoie un texte pour en faire un nom de fichier valide"""
     text = unicodedata.normalize('NFKD', str(text))
@@ -417,11 +407,7 @@ def load_excel_data():
             if not prenom and not nom:
                 continue
 
-<<<<<<< HEAD
             key = make_student_key(prenom, nom)
-=======
-            key = (prenom.lower(), nom.lower())
->>>>>>> 508129f4055a5323f147a06ff333a59de632ac24
 
             if key not in students_map:
                 students_map[key] = {
@@ -455,11 +441,7 @@ def load_excel_data():
             nom_id = capitalize_name(str(row[2] or ""))
             prenom_id = capitalize_name(str(row[3] or ""))
             date_naiss = row[4]  # datetime object
-<<<<<<< HEAD
             key = make_student_key(prenom_id, nom_id)
-=======
-            key = (prenom_id.lower(), nom_id.lower())
->>>>>>> 508129f4055a5323f147a06ff333a59de632ac24
 
             if key in students_map:
                 students_map[key]["date_naissance"] = date_naiss
@@ -492,11 +474,7 @@ def load_identity_choices():
             prenom = capitalize_name(str(row[3] or ""))
             if not nom and not prenom:
                 continue
-<<<<<<< HEAD
             key = make_student_key(prenom, nom)
-=======
-            key = (prenom.lower(), nom.lower())
->>>>>>> 508129f4055a5323f147a06ff333a59de632ac24
             date_naiss = row[4] if len(row) > 4 else None
             parcoursup = str(row[5] or "").strip() if len(row) > 5 else ""
             if "PAES" in parcoursup or "Diploma" in parcoursup:
@@ -513,7 +491,6 @@ def load_identity_choices():
     return {}
 
 
-<<<<<<< HEAD
 def load_nouveaux_resultats(existing_keys):
     """Charge les resultats depuis nouveauxresultats/ pour les etudiants
     qui n'existent PAS deja dans les donnees notes/.
@@ -679,8 +656,6 @@ def load_bulletins_paes_only_students(existing_keys, nouveaux_keys):
     return students
 
 
-=======
->>>>>>> 508129f4055a5323f147a06ff333a59de632ac24
 def calculate_class_stats(students, matieres_config, notes_key_fn=None):
     """Calcule les statistiques de classe pour chaque matiere.
     notes_key_fn: fonction qui prend une matiere et retourne la cle dans student['notes']
@@ -855,18 +830,11 @@ def generate_index_html(students, profil_paes, profil_linova):
             date_naiss_html = date_naiss
 
         choix = student.get("choix", "Formulaire non rempli")
-<<<<<<< HEAD
         nouveau_badge = ' <span class="badge-nouveau">Nouveau</span>' if student.get("_is_new") else ''
 
         row = f"""
             <tr>
                 <td>{student['prenom'] or ''}{nouveau_badge}</td>
-=======
-
-        row = f"""
-            <tr>
-                <td>{student['prenom'] or ''}</td>
->>>>>>> 508129f4055a5323f147a06ff333a59de632ac24
                 <td>{student['nom'] or ''}</td>
                 <td><a href="mailto:{student.get('email') or ''}">{student.get('email') or ''}</a></td>
                 <td>{date_naiss_html}</td>
@@ -1100,7 +1068,6 @@ def generate_index_html(students, profil_paes, profil_linova):
             font-style: italic;
         }}
 
-<<<<<<< HEAD
         .badge-nouveau {{
             display: inline-block;
             background: #e67e22;
@@ -1115,8 +1082,6 @@ def generate_index_html(students, profil_paes, profil_linova):
             letter-spacing: 0.5px;
         }}
 
-=======
->>>>>>> 508129f4055a5323f147a06ff333a59de632ac24
         .choix-cell {{
             font-size: 12px;
             font-weight: 500;
@@ -1257,17 +1222,12 @@ def main():
     # Charger les donnees Excel
     print(f"[...] Chargement des données Excel depuis {NOTES_DIR}...")
     students = load_excel_data()
-<<<<<<< HEAD
     print(f"[OK] {len(students)} élèves chargés depuis notes/")
-=======
-    print(f"[OK] {len(students)} élèves chargés")
->>>>>>> 508129f4055a5323f147a06ff333a59de632ac24
 
     if not students:
         print("[ERREUR] Aucun élève trouvé. Vérifiez les fichiers Excel dans le dossier notes/")
         return
 
-<<<<<<< HEAD
     # Charger les nouveaux étudiants depuis nouveauxresultats/
     print(f"[...] Chargement des nouveaux résultats depuis {NOUVEAUX_RESULTATS_DIR}...")
     existing_keys = set(
@@ -1297,21 +1257,12 @@ def main():
     enriched_students = []
     for s in students:
         key = make_student_key(s.get("prenom") or "", s.get("nom") or "")
-=======
-    # Enrichir les élèves avec les données du formulaire identité (date + choix)
-    print(f"[...] Chargement du formulaire identité...")
-    identity_dict = load_identity_choices()
-    enriched_students = []
-    for s in students:
-        key = ((s.get("prenom") or "").lower(), (s.get("nom") or "").lower())
->>>>>>> 508129f4055a5323f147a06ff333a59de632ac24
         if key in identity_dict:
             enriched_students.append({
                 **s,
                 "date_naissance": identity_dict[key]["date_naissance"],
                 "choix": identity_dict[key]["choix"],
             })
-<<<<<<< HEAD
         elif key in bulletins_paes_identities:
             enriched_students.append({
                 **s,
@@ -1322,12 +1273,6 @@ def main():
             enriched_students.append({
                 **s,
                 "choix": s.get("choix", "Formulaire non rempli"),
-=======
-        else:
-            enriched_students.append({
-                **s,
-                "choix": "Formulaire non rempli",
->>>>>>> 508129f4055a5323f147a06ff333a59de632ac24
             })
 
     # Vérifier s'il faut nettoyer (première exécution avec --clean ou --force-clean)
@@ -1349,7 +1294,6 @@ def main():
     # Pre-calculer les notes ajustees UNE SEULE FOIS par eleve/matiere PAES
     # pour que PAES et Linova aient exactement les memes moyennes
     # Seed fixe pour que les notes soient identiques si on relance le script
-<<<<<<< HEAD
     # On traite les eleves existants AVANT les nouveaux pour preserver le seed
     print(f"[...] Pré-calcul des notes ajustées (identiques PAES/Linova)...")
     random.seed(42)
@@ -1357,17 +1301,11 @@ def main():
     new_enriched = [s for s in enriched_students if s.get("_is_new")]
 
     for student in existing_enriched:
-=======
-    print(f"[...] Pré-calcul des notes ajustées (identiques PAES/Linova)...")
-    random.seed(42)
-    for student in enriched_students:
->>>>>>> 508129f4055a5323f147a06ff333a59de632ac24
         adjusted = {}
         for matiere in MATIERES_PAES:
             raw_note = student["notes"].get(matiere["nom"])
             adjusted[matiere["nom"]] = adjust_grade(raw_note)
         student["adjusted_notes"] = adjusted
-<<<<<<< HEAD
 
     for student in new_enriched:
         adjusted = {}
@@ -1378,9 +1316,6 @@ def main():
 
     enriched_students = existing_enriched + new_enriched
     print(f"[OK] Notes ajustées pré-calculées ({len(existing_enriched)} existants + {len(new_enriched)} nouveaux)")
-=======
-    print(f"[OK] Notes ajustées pré-calculées")
->>>>>>> 508129f4055a5323f147a06ff333a59de632ac24
 
     # Calculer les statistiques de classe pour PAES (avec notes pre-calculees)
     print(f"[...] Calcul des statistiques de classe PAES...")
